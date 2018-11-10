@@ -10,12 +10,12 @@
 package com.xx.wuli;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.PixelFormat;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.Display;
 import android.view.Gravity;
@@ -29,6 +29,8 @@ import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RelativeLayout;
@@ -36,12 +38,15 @@ import android.widget.Toast;
 
 import com.hikvision.netsdk.ExceptionCallBack;
 import com.hikvision.netsdk.HCNetSDK;
+import com.hikvision.netsdk.NET_DVR_COMPRESSIONCFG_V30;
 import com.hikvision.netsdk.NET_DVR_DEVICEINFO_V30;
 import com.hikvision.netsdk.NET_DVR_PREVIEWINFO;
 import com.hikvision.netsdk.PTZCommand;
 import com.hikvision.netsdk.RealPlayCallBack;
 
 import org.MediaPlayer.PlayM4.Player;
+
+import java.util.List;
 
 import static com.hikvision.netsdk.PTZPresetCmd.CLE_PRESET;
 import static com.hikvision.netsdk.PTZPresetCmd.SET_PRESET;
@@ -83,6 +88,10 @@ public class CameraBaseActivity extends Activity implements Callback, OnTouchLis
     public String USER = "admin";
     public String PSD = "vr123456";
 
+    float rate = (float) 4.0 / 3;
+    int heigth;
+    int width;
+
     /**
      * Called when the activity is first created.
      */
@@ -92,6 +101,11 @@ public class CameraBaseActivity extends Activity implements Callback, OnTouchLis
 
         //如果是竖排,则改为横排;反之然
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+
+        Display display = getWindowManager().getDefaultDisplay();
+        heigth = display.getWidth();
+        width = display.getHeight();
+
         Intent intent = getIntent();
         Bundle bundle = intent.getExtras();
         ADDRESS = bundle.getString("ip");
@@ -117,23 +131,66 @@ public class CameraBaseActivity extends Activity implements Callback, OnTouchLis
 
     }
 
-    private void init(){
+    private void init() {
         if (!initeSdk()) {
             this.finish();
             return;
         }
         //设置连接时间与重连时间
-        HCNetSDK.getInstance().NET_DVR_SetConnectTime(100000);
-        HCNetSDK.getInstance().NET_DVR_SetRecvTimeOut(100000);
-        HCNetSDK.getInstance().NET_DVR_SetReconnect(100000, true);
+        HCNetSDK.getInstance().NET_DVR_SetConnectTime(8000);
+        HCNetSDK.getInstance().NET_DVR_SetRecvTimeOut(8000);
+        HCNetSDK.getInstance().NET_DVR_SetReconnect(10000, true);
         // login on the device
         m_iLogID = loginDevice();
         if (m_iLogID < 0) {
+            showMsg("登录失败！");
             Log.e(TAG, "----------------This device logins failed!-------------------");
+
             return;
         } else {
             System.out.println("-----------------------m_iLogID=---------------------" + m_iLogID);
+            try {
+                //获取分辨率
+                NET_DVR_COMPRESSIONCFG_V30 info = CameraManager.getCompressInfo(m_iLogID);
+                VideoParamsBean vp = new VideoParamsBean();
+                vp.parse(info);
+                VideoShemaBean vb = CameraManager.getIpcAbility(m_iLogID);
+
+                List<VideoResolution> ress = vb.getMainChannel().getSolutions();
+                String c_res = vp.getMainStream().getResolution();
+                for (VideoResolution v : ress) {
+                    if (c_res.equals(v.getIndex())) {
+                        String xy = v.getResolution();
+                        if (xy != null && xy.indexOf("*") != -1) {
+                            xy = xy.replace("*", "&");
+                            String[] xys = xy.split("&");
+                            float w = Float.parseFloat(xys[0]);
+                            float h = Float.parseFloat(xys[1]);
+                            rate = w / h;
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    RelativeLayout.LayoutParams linearParams = (RelativeLayout.LayoutParams) m_osurfaceView.getLayoutParams(); //取控件textView当前的布局参数 linearParams.height = 20;// 控件的高强制设成20
+                                    linearParams.width = (int) (width * rate);// 控件的宽强制设成30
+                                    linearParams.height = width;// 控件的宽强制设成30
+                                    m_osurfaceView.setLayoutParams(linearParams); //使设置好的布局参数应用到控件
+
+                                }
+                            });
+                        }
+                  /* 1280*720
+                   1280*960
+                   1920*1080
+                   2048*1536*/
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
+
         // get instance of exception callback and set
         ExceptionCallBack oexceptionCbf = getExceptiongCbf();
         if (oexceptionCbf == null) {
@@ -243,6 +300,7 @@ public class CameraBaseActivity extends Activity implements Callback, OnTouchLis
     // get controller instance
     private void findViews() {
 
+        final RelativeLayout btns = findViewById(R.id.CAMlinear);
         this.btnZoomOut = (Button) findViewById(R.id.btn_ZoomOut);
         this.btnZoomIn = (Button) findViewById(R.id.btn_ZoomIn);
         this.btnRight = (Button) findViewById(R.id.btn_Right);
@@ -256,23 +314,71 @@ public class CameraBaseActivity extends Activity implements Callback, OnTouchLis
         btnZoomIn.setOnTouchListener(this);
         btnZoomOut.setOnTouchListener(this);
         this.m_osurfaceView = (SurfaceView) findViewById(R.id.sf_VideoMonitor);
-        Display display = getWindowManager().getDefaultDisplay();
-        int heigth = display.getWidth();
-        int width = display.getHeight();
+
         RelativeLayout.LayoutParams linearParams = (RelativeLayout.LayoutParams) m_osurfaceView.getLayoutParams(); //取控件textView当前的布局参数 linearParams.height = 20;// 控件的高强制设成20
-        linearParams.width = width * 4 / 3;// 控件的宽强制设成30
+        linearParams.width = (int) (width * rate);// 控件的宽强制设成30
         linearParams.height = width;// 控件的宽强制设成30
         m_osurfaceView.setLayoutParams(linearParams); //使设置好的布局参数应用到控件
 
+        System.out.println("----------------rate----------------------:" + rate);
+
+        m_osurfaceView.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(btns.getVisibility() == View.GONE){
+                    showAndHiddenAnimation(btns,1,300);
+                }else {
+                    showAndHiddenAnimation(btns,0,300);
+                }
+            }
+        });
+
     }
+
+    /**
+     * 渐隐渐现动画
+     * @param view 需要实现动画的对象
+     * @param state 需要实现的状态
+     * @param duration 动画实现的时长（ms）
+     */
+    public static void showAndHiddenAnimation(final View view,int state,long duration){
+        float start = 0f;
+        float end = 0f;
+        if(state == 1){
+            end = 1f;
+            view.setVisibility(View.VISIBLE);
+        } else
+        if(state == 0){
+            start = 1f;
+            view.setVisibility(View.GONE);
+        }
+        AlphaAnimation animation = new AlphaAnimation(start, end);
+        animation.setDuration(duration);
+        animation.setFillAfter(true);
+        animation.setAnimationListener(new Animation.AnimationListener() {
+
+            @Override
+            public void onAnimationStart(Animation animation) {
+            }
+
+            @Override
+            public void onAnimationRepeat(Animation animation) {
+            }
+
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                view.clearAnimation();
+            }
+        });
+        view.setAnimation(animation);
+        animation.start();
+    }
+
 
     @Override
     public boolean onTouch(final View v, final MotionEvent event) {
-        System.out.println("==========================1====================================");
 
         if (!NotNull.isNotNull(h1)) return false;
-        System.out.println("===========================2===================================");
-        Log.d(TAG, "onTouch: ");
         new Thread() {
             @Override
             public void run() {
@@ -373,7 +479,7 @@ public class CameraBaseActivity extends Activity implements Callback, OnTouchLis
 
         NET_DVR_PREVIEWINFO previewInfo = new NET_DVR_PREVIEWINFO();
         previewInfo.lChannel = m_iStartChan;
-        previewInfo.dwStreamType = 0; // substream
+        previewInfo.dwStreamType = 1; // substream
         previewInfo.bBlocked = 1;
 //
         m_iPlayID = HCNetSDK.getInstance().NET_DVR_RealPlay_V40(m_iLogID,
@@ -683,5 +789,15 @@ public class CameraBaseActivity extends Activity implements Callback, OnTouchLis
         });
 
 
+    }
+
+    private void showMsg(final String msg) {
+        final CharSequence cm = msg;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(getApplicationContext(), cm.toString(), Toast.LENGTH_SHORT);
+            }
+        });
     }
 }

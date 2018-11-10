@@ -7,14 +7,23 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 
 import com.hikvision.netsdk.HCNetSDK;
+import com.hikvision.netsdk.NET_DVR_COMPRESSIONCFG_V30;
+import com.hikvision.netsdk.NET_DVR_CONFIG;
 import com.hikvision.netsdk.NET_DVR_DEVICEINFO_V30;
 import com.hikvision.netsdk.NET_DVR_PREVIEWINFO;
 import com.hikvision.netsdk.PTZCommand;
 import com.hikvision.netsdk.PTZPresetCmd;
 import com.hikvision.netsdk.RealPlayCallBack;
+import com.sun.jna.Memory;
+import com.sun.jna.NativeLong;
+import com.sun.jna.Pointer;
+import com.sun.jna.ptr.ByteByReference;
+import com.sun.jna.ptr.IntByReference;
 
 import org.MediaPlayer.PlayM4.Player;
 import org.MediaPlayer.PlayM4.PlayerCallBack;
+
+import static com.hikvision.netsdk.HCNetSDK.DEVICE_ENCODE_ALL_ABILITY_V20;
 
 /**
  * Created by JJT-ssd on 2016/9/23.
@@ -398,6 +407,7 @@ public class CameraManager {
                     if (m_iPort >= 0) {
                         break;
                     }
+
                     m_iPort = Player.getInstance().getPort();
                     if (m_iPort == -1) break;//获取播放端口失败！
                     if (iDataSize > 0) {
@@ -718,7 +728,7 @@ public class CameraManager {
     }
 
     //预置点操作
-    public void setPoint(int point,int m_iPlayID) {
+    public void setPoint(int point, int m_iPlayID) {
         switch (point) {
             case 8://设置预置点
 
@@ -1399,5 +1409,46 @@ public class CameraManager {
                 return "[" + errorCode + " NET_???_??] 未知错误。";
         }
     }
+
+    public static NET_DVR_COMPRESSIONCFG_V30 getCompressInfo(int lUserID) {
+        NET_DVR_COMPRESSIONCFG_V30 net_dvr_config;
+        try {
+            net_dvr_config = new NET_DVR_COMPRESSIONCFG_V30();//设备信息
+
+            HCNetSDK.getInstance().NET_DVR_GetDVRConfig(lUserID, HCNetSDK.NET_DVR_GET_COMPRESSCFG_V30, 1, net_dvr_config);
+        } catch (Exception e) {
+            System.out.println("获取视频压缩参数出错...");
+            System.out.println(HCNetSDK.getInstance().NET_DVR_GetLastError());
+            return null;
+        }
+        return net_dvr_config;
+
+    }
+
+    public static VideoShemaBean getIpcAbility(int lUserID) {
+        VideoShemaBean shema = null;
+        System.out.println("获取能力集");
+        String xmlInput = "<?xml version=\"1.0\" encoding=\"utf-8\"?><AudioVideoCompressInfo><AudioChannelNumber>1</AudioChannelNumber><VoiceTalkChannelNumber>1</VoiceTalkChannelNumber><VideoChannelNumber>1</VideoChannelNumber></AudioVideoCompressInfo>";
+        int XML_ABILITY_OUT_LEN = 3 * 1024 * 1024;
+        byte[] memory = new byte[XML_ABILITY_OUT_LEN];
+        ByteByReference byteRef = new ByteByReference();
+        boolean net_DVR_GetDeviceAbility =  HCNetSDK.getInstance().NET_DVR_GetDeviceAbility(lUserID, DEVICE_ENCODE_ALL_ABILITY_V20, xmlInput.getBytes(), xmlInput.getBytes().length, memory, XML_ABILITY_OUT_LEN);//ok
+        int iErr =  HCNetSDK.getInstance().NET_DVR_GetLastError();
+        System.out.println("iErr:" + iErr);
+
+        if (iErr > 0)
+            return null;
+
+
+//        HCNetSDK.getInstance().NET_DVR_GetDeviceAbility(lUserID, DEVICE_ENCODE_ALL_ABILITY_V20 , xmlInput, xmlInput.getBytes().length, byteRef, XML_ABILITY_OUT_LEN);
+       /* Pointer memory = new Memory(1000);
+        String xmlOutPut = memory.getString(0);*/
+        shema = new VideoShemaBean();
+        shema.parse(memory);
+
+
+        return shema;
+    }
+
 
 }
