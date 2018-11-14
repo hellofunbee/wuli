@@ -39,6 +39,7 @@
             </intent-filter>
         </activity>
         <activity android:name="com.xx.wuli.CameraBaseActivity"></activity>
+        <activity android:name="com.xx.wuli.WebviewActivity"></activity>
     </application>
 
 </manifest>
