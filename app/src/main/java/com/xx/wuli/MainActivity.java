@@ -27,12 +27,13 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private WebView webView;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.webview);
 
-        webView =findViewById(R.id.webview);
+        webView = findViewById(R.id.webview);
         webView.addJavascriptInterface(new AndroidView(), "AndroidView");
         setSettings();
         webView.loadUrl("http://39.107.119.69:8087/wuli/login.html");//加载url
@@ -62,7 +63,7 @@ public class MainActivity extends Activity {
         webView.getSettings().setGeolocationEnabled(true);//定位
         webView.getSettings().setGeolocationDatabasePath(dir);//数据库
         webView.getSettings().setDomStorageEnabled(true);//缓存 （ 远程web数据的本地化存储）
-        WebViewClient myWebViewClient = new WebViewClient(){
+        WebViewClient myWebViewClient = new WebViewClient() {
             @Override
             // 在点击请求的是链接是才会调用，重写此方法返回true表明点击网页里面的链接还是在当前的webview里跳转，不跳到浏览器那边。这个函数我们可以做很多操作，比如我们读取到某些特殊的URL，于是就可以不打开地址，取消这个操作，进行预先定义的其他操作，这对一个程序是非常必要的。
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -106,6 +107,15 @@ public class MainActivity extends Activity {
             intent.putExtras(bundle);
             startActivity(intent);//不需要返回数据的
             return "1";
+        }
+
+        @JavascriptInterface
+        public void open(String url) {
+            Intent intent = new Intent(MainActivity.this, WebviewActivity.class);
+            Bundle bundle = new Bundle();
+            bundle.putString("url", url);
+            intent.putExtras(bundle);
+            startActivity(intent);
         }
     }
 

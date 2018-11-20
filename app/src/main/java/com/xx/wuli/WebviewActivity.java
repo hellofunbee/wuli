@@ -13,8 +13,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
+import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.GeolocationPermissions;
@@ -24,27 +23,31 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
-import android.widget.Toast;
+import android.widget.TextView;
 
 
 public class WebviewActivity extends Activity {
     private WebView webView;
+    private Button btn_back;
+    private TextView title;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.webview2);
         Intent intent = getIntent();
         Bundle bundle = intent.getExtras();
-      String url   = bundle.getString("url");
+        String url = bundle.getString("url");
 
-      Button btn  = findViewById(R.id.back);
-        btn.setOnClickListener(new View.OnClickListener() {
+        btn_back = findViewById(R.id.back);
+        title = findViewById(R.id.title);
+        btn_back.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 finish();
             }
         });
-        webView =findViewById(R.id.webview);
+        webView = findViewById(R.id.webview);
         webView.addJavascriptInterface(new AndroidView(), "AndroidView");
         setSettings();
         webView.loadUrl(url);//加载url
@@ -74,8 +77,20 @@ public class WebviewActivity extends Activity {
         webView.getSettings().setGeolocationEnabled(true);//定位
         webView.getSettings().setGeolocationDatabasePath(dir);//数据库
         webView.getSettings().setDomStorageEnabled(true);//缓存 （ 远程web数据的本地化存储）
-        WebViewClient myWebViewClient = new WebViewClient();//建立对象
-        webView.setWebViewClient(myWebViewClient);//调用
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                String t = view.getTitle();
+                if (!TextUtils.isEmpty(t)) {
+                    if (t.length() > 14) {
+                        t = t.substring(0, 14) + "...";
+                    }
+                    title.setText(t);
+                }
+            }
+        });//调用
         webView.setWebChromeClient(new WebChromeClient() {
 
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
@@ -113,15 +128,14 @@ public class WebviewActivity extends Activity {
     }
 
 
-
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-           if(webView.canGoBack()){
-               webView.goBack();
-           }else {
-               return super.onKeyDown(keyCode, event);
-           }
+            if (webView.canGoBack()) {
+                webView.goBack();
+            } else {
+                return super.onKeyDown(keyCode, event);
+            }
             return false;
         }
         return super.onKeyDown(keyCode, event);
