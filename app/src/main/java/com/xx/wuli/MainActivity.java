@@ -36,7 +36,7 @@ public class MainActivity extends Activity {
         webView = findViewById(R.id.webview);
         webView.addJavascriptInterface(new AndroidView(), "AndroidView");
         setSettings();
-        webView.loadUrl("http://39.107.119.69:8087/wuli/login.html");//加载url
+        webView.loadUrl("http://211.82.10.173:8087/wuli/login.html");//加载url
 
     }
 
